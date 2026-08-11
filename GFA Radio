@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GFA Radio - Companion</title>
+    <!-- Firebase App (compat version for Realtime Database) -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #gfa-radio-panel {
+            width: 320px;
+            background: rgba(20, 20, 20, 0.95);
+            border: 1px solid #00d2ff;
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: 0 4px 15px rgba(0, 210, 255, 0.2);
+        }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #00d2ff;
+            font-size: 13px;
+        }
+        #radio-close-btn {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        #radio-close-btn:hover {
+            color: #fff;
+        }
+        .controls-row {
+            margin: 5px 0;
+            font-size: 11px;
+        }
+        .controls-row input, .controls-row select {
+            background: #222;
+            color: white;
+            border: 1px solid #444;
+            padding: 3px;
+            font-size: 11px;
+            border-radius: 3px;
+        }
+        #radio-log {
+            height: 200px;
+            overflow-y: scroll;
+            margin: 8px 0;
+            font-size: 11px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #333;
+        }
+        #radio-input {
+            width: 100%;
+            background: #222;
+            border: 1px solid #444;
+            color: white;
+            padding: 6px;
+            font-size: 12px;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gfa-radio-panel">
+        <div class="header-row">
+            <span>GFA RADIO LIVE</span>
+            <button id="radio-close-btn">&times;</button>
+        </div>
+        <div class="controls-row">
+            Callsign: <input id="radio-callsign" style="width:80px;" placeholder="Callsign">
+        </div>
+        <div class="controls-row">
+            Role: <select id="radio-role">
+                <option value="Pilot">Pilot</option>
+                <option value="ATC">ATC</option>
+                <option value="Ground">Ground</option>
+            </select>
+            ICAO: <input id="radio-icao" style="width:50px;" placeholder="KJFK">
+        </div>
+        <div id="radio-log"></div>
+        <input id="radio-input" placeholder="Type transmission and press Enter...">
+    </div>
+
+    <script>
+        // TODO: Replace with your actual Firebase config object
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            databaseURL: "YOUR_DATABASE_URL",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const panel = document.getElementById('gfa-radio-panel');
+        const closeBtn = document.getElementById('radio-close-btn');
+
+        // Simple toggle for the standalone page close button
+        closeBtn.addEventListener('click', () => {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+
+        const logContainer = document.getElementById('radio-log');
+        const inputField = document.getElementById('radio-input');
+        const callsignField = document.getElementById('radio-callsign');
+        const roleField = document.getElementById('radio-role');
+        const icaoField = document.getElementById('radio-icao');
+
+        // Reference to Firebase messages node
+        const messagesRef = db.ref('radio/messages');
+
+        // Listen for Enter key to push to Firebase
+        inputField.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                const text = this.value.trim();
+                const callsign = callsignField.value.trim() || 'Anonymous';
+                const role = roleField.value;
+                const icao = icaoField.value.trim().toUpperCase() || 'GLOBAL';
+
+                if (text) {
+                    messagesRef.push({
+                        callsign: callsign,
+                        role: role,
+                        icao: icao,
+                        text: text,
+                        timestamp: Date.now()
+                    });
+                    this.value = '';
+                }
+            }
+        });
+
+        // Listen for incoming messages from Firebase in real-time
+        messagesRef.limitToLast(30).on('child_added', (snapshot) => {
+            const data = snapshot.val();
+            const msgDiv = document.createElement('div');
+            msgDiv.style.marginBottom = '4px';
+            
+            // Color code based on role
+            let roleColor = '#00d2ff';
+            if (data.role === 'ATC') roleColor = '#ff3333';
+            if (data.role === 'Ground') roleColor = '#33ff33';
+
+            msgDiv.innerHTML = `<span style="color:${roleColor};">[${data.role}]</span> <b>${data.callsign}</b> (${data.icao}): ${data.text}`;
+            logContainer.appendChild(msgDiv);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        });
+    </script>
+</body>
+</html>
