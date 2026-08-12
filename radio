@@ -1,0 +1,87 @@
+    }
+    const db = firebase.database();
+
+    // Create the Main Radio UI Container
+    const radioDiv = document.createElement('div');
+    radioDiv.innerHTML = `
+        <div id="gfa-radio-panel" style="position:fixed; top:20px; right:20px; width:280px; background:rgba(0,0,0,0.85); color:white; padding:10px; border-radius:8px; border:1px solid #00d2ff; z-index:9999; font-family:monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <h3 style="margin:0; font-size:14px; color:#00d2ff;">GFA Radio</h3>
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <input id="radio-callsign" style="width:90px; background:#222; border:1px solid #444; color:white; padding:2px; font-size:11px;" placeholder="Callsign">
+                    <button id="radio-close-btn" style="background:none; border:none; color:#aaa; font-size:16px; cursor:pointer; font-weight:bold; padding:0 3px;">&times;</button>
+                </div>
+            </div>
+            <div style="margin:5px 0; font-size:11px;">
+                Role: <select id="radio-role" style="background:#222; color:white; border:1px solid #444;"><option value="Pilot">Pilot</option><option value="ATC">ATC</option><option value="Ground">Ground</option></select>
+                ICAO: <input id="radio-icao" style="width:50px; background:#222; border:1px solid #444; color:white; padding:2px; font-size:11px;" placeholder="KJFK">
+            </div>
+            <div id="radio-log" style="height:140px; overflow-y:scroll; margin:8px 0; font-size:11px; background:rgba(0,0,0,0.5); padding:5px; border-radius:4px;"></div>
+            <input id="radio-input" style="width:100%; background:#222; border:1px solid #444; color:white; padding:5px; font-size:12px;" placeholder="Type transmission...">
+        </div>
+
+        <button id="gfa-radio-open-btn" style="position:fixed; top:20px; right:0px; background:rgba(0,0,0,0.85); color:#00d2ff; border:1px solid #00d2ff; border-right:none; padding:8px 10px; border-radius:6px 0 0 6px; z-index:9998; font-family:monospace; cursor:pointer; display:none; font-size:14px; font-weight:bold;">&#9664;</button>
+    `;
+    document.body.appendChild(radioDiv);
+
+    const panel = document.getElementById('gfa-radio-panel');
+    const openBtn = document.getElementById('gfa-radio-open-btn');
+    const closeBtn = document.getElementById('radio-close-btn');
+
+    // Toggle logic for hiding and showing the panel
+    closeBtn.addEventListener('click', () => {
+        panel.style.display = 'none';
+        openBtn.style.display = 'block';
+    });
+
+    openBtn.addEventListener('click', () => {
+        panel.style.display = 'block';
+        openBtn.style.display = 'none';
+    });
+
+    const logContainer = document.getElementById('radio-log');
+    const inputField = document.getElementById('radio-input');
+    const callsignField = document.getElementById('radio-callsign');
+    const roleField = document.getElementById('radio-role');
+    const icaoField = document.getElementById('radio-icao');
+
+    // Reference to Firebase messages node
+    const messagesRef = db.ref('radio/messages');
+
+    // Listen for Enter key to push to Firebase
+    inputField.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            const text = this.value.trim();
+            const callsign = callsignField.value.trim() || 'Anonymous';
+            const role = roleField.value;
+            const icao = icaoField.value.trim().toUpperCase() || 'GLOBAL';
+
+            if (text) {
+                messagesRef.push({
+                    callsign: callsign,
+                    role: role,
+                    icao: icao,
+                    text: text,
+                    timestamp: Date.now()
+                });
+                this.value = '';
+            }
+        }
+    });
+
+    // Listen for incoming messages from Firebase in real-time
+    messagesRef.limitToLast(30).on('child_added', (snapshot) => {
+        const data = snapshot.val();
+        const msgDiv = document.createElement('div');
+        msgDiv.style.marginBottom = '4px';
+        
+        // Color code based on role
+        let roleColor = '#00d2ff';
+        if (data.role === 'ATC') roleColor = '#ff3333';
+        if (data.role === 'Ground') roleColor = '#33ff33';
+
+        msgDiv.innerHTML = `<span style="color:${roleColor};">[${data.role}]</span> <b>${data.callsign}</b> (${data.icao}): ${data.text}`;
+        logContainer.appendChild(msgDiv);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    });
+})();
